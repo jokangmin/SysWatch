@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+            background-color: #f4f7f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 20px 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 { color: #2c3e50; text-align: center; }
+
+        #system-summary {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            border: 1px solid #e0e0e0;
+        }
+        .summary-box { flex: 1; min-width: 180px; text-align: center; }
+        .summary-title { font-size: 0.9em; color: #6c757d; margin-bottom: 5px; }
+        .summary-value { font-size: 1.1em; color: #343a40; font-weight: 600; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border-bottom: 1px solid #e0e0e0; padding: 12px 15px; text-align: left; }
+        thead tr { background-color: #4a6fa5; color: #ffffff; }
+        th { font-weight: 600; }
+        tbody tr:nth-child(even) { background-color: #f8f9fa; }
+        tbody tr:hover { background-color: #e9ecef; }
+        .loading { text-align: center; padding: 20px; font-size: 1.2em; color: #777; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>📊 시스템 대시보드</h1>
+        
+        <div id="system-summary">
+            <div class="summary-box">
+                <div class="summary-title">CPU Usage</div>
+                <div class="summary-value" id="summary-cpu">Loading...</div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-title">Memory Usage</div>
+                <div class="summary-value" id="summary-mem">Loading...</div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-title">Tasks</div>
+                <div class="summary-value" id="summary-tasks">Loading...</div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-title">Load Average</div>
+                <div class="summary-value" id="summary-load">Loading...</div>
+            </div>
+        </div>
+
+        <h2>💻 프로세스 목록 (CPU 사용량 순)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>PID</th>
+                    <th>User</th>
+                    <th>CPU (%)</th>
+                    <th>Memory (%)</th>
+                    <th>Command</th>
+                </tr>
+            </thead>
+            <tbody id="process-body">
+                <tr>
+                    <td colspan="5" class="loading">목록을 불러오는 중...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const tableBody = document.getElementById('process-body');
+            const summaryCpu = document.getElementById('summary-cpu');
+            const summaryMem = document.getElementById('summary-mem');
+            const summaryTasks = document.getElementById('summary-tasks');
+            const summaryLoad = document.getElementById('summary-load');
+
+            const fetchSystemStatus = async () => {
+                try {
+                    const response = await fetch('/system/proc');
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                    const { summary, processes } = await response.json();
+                    
+                    summaryCpu.textContent = summary.cpuUsage;
+                    summaryMem.textContent = summary.memUsage;
+                    summaryTasks.textContent = summary.tasks;
+                    summaryLoad.textContent = summary.loadAverage;
+
+                    tableBody.innerHTML = '';
+                    if (processes.length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="5" class="loading">실행 중인 프로세스가 없습니다.</td></tr>';
+                        return;
+                    }
+                    processes.forEach(proc => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${proc.pid}</td>
+                            <td>${proc.user}</td>
+                            <td>${proc.cpu.toFixed(2)}</td>
+                            <td>${proc.mem.toFixed(2)}</td>
+                            <td>${proc.comm}</td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                } catch (error) {
+                    console.error("시스템 상태를 가져오는 데 실패했습니다:", error);
+                    tableBody.innerHTML = `<tr><td colspan="5" class="loading" style="color: red;">데이터 로딩 실패!</td></tr>`;
+                    summaryCpu.textContent = summaryMem.textContent = summaryTasks.textContent = summaryLoad.textContent = 'Error';
+                }
+            };
+
+            fetchSystemStatus();
+            setInterval(fetchSystemStatus, 5000);
+        });
+    </script>
+</body>
+</html>

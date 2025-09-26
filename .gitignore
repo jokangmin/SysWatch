@@ -1,0 +1,12 @@
+# 환경 변수
+.env
+# 로그 파일
+*.log
+
+# 빌드 결과물
+dist/
+build/
+
+# IDE 설정
+.vscode/
+.idea/
