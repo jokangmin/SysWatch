@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -33,9 +34,12 @@
       margin-bottom: 25px;
       border: 1px solid #e0e0e0;
     }
-    .summary-box { flex: 1; min-width: 180px; text-align: center; }
-    .summary-title { font-size: 0.9em; color: #6c757d; margin-bottom: 5px; }
-    .summary-value { font-size: 1.1em; color: #343a40; font-weight: 600; }
+    .summary-box { flex: 1; min-width: 220px; text-align: center; }
+    .summary-title { font-size: 1em; color: #6c757d; margin-bottom: 5px; }
+    .summary-value { font-size: 1em; color: #343a40; font-weight: 500; line-height: 1.6; }
+    .summary-value[data-type="cpu"].high { color: #dc3545; }
+    .summary-value[data-type="cpu"].medium { color: #ffc107; }
+    .summary-value[data-type="cpu"].low { color: #28a745; }
 
     #controls {
       display: flex;
@@ -66,26 +70,40 @@
     
     <div id="system-summary">
       <div class="summary-box">
-        <div class="summary-title">CPU Usage</div>
-        <div class="summary-value" id="summary-cpu">Loading...</div>
+        <div class="summary-title">⚙️ CPU 사용률</div>
+        <div class="summary-value" id="summary-cpu" data-type="cpu">Loading...</div>
       </div>
       <div class="summary-box">
-        <div class="summary-title">Memory Usage</div>
-        <div class="summary-value" id="summary-mem">Loading...</div>
+        <div class="summary-title">🧠 메모리 사용량</div>
+        <div class="summary-value" id="summary-mem">
+          <div>총: -</div>
+          <div>사용: -</div>
+          <div>남음: -</div>
+          <div>버퍼/캐시: -</div>
+        </div>
       </div>
       <div class="summary-box">
-        <div class="summary-title">Tasks</div>
-        <div class="summary-value" id="summary-tasks">Loading...</div>
+        <div class="summary-title">📋 작업(Task)</div>
+        <div class="summary-value" id="summary-tasks">
+          <div>전체: -</div>
+          <div>실행 중: -</div>
+          <div>슬립: -</div>
+          <div>좀비: -</div>
+        </div>
       </div>
       <div class="summary-box">
-        <div class="summary-title">Load Average</div>
-        <div class="summary-value" id="summary-load">Loading...</div>
+        <div class="summary-title">📊 부하 평균</div>
+        <div class="summary-value" id="summary-load">
+          <div>1분: -</div>
+          <div>5분: -</div>
+          <div>15분: -</div>
+        </div>
       </div>
     </div>
 
     <div id="controls">
       <h2>💻 프로세스 목록</h2>
-      <input type="text" id="search" placeholder="🔍 User 또는 Command 검색..." />
+      <input type="text" id="search" placeholder="🔍 사용자 또는 명령어 검색..." />
     </div>
 
     <table>
@@ -106,7 +124,9 @@
     </table>
   </div>
 
+
   <script>
+    
     document.addEventListener('DOMContentLoaded', () => {
       const tableBody = document.getElementById('process-body');
       const summaryCpu = document.getElementById('summary-cpu');
@@ -159,10 +179,42 @@
           const { summary, processes: data } = await response.json();
           processes = data;
 
+          // CPU
           summaryCpu.textContent = summary.cpuUsage;
-          summaryMem.textContent = summary.memUsage;
-          summaryTasks.textContent = summary.tasks;
-          summaryLoad.textContent = summary.loadAverage;
+          const cpuPercent = parseFloat(summary.cpuUsage.split(',')[0]);
+          if (cpuPercent > 50) {
+            summaryCpu.classList.add("high");
+          } else if (cpuPercent > 20) {
+            summaryCpu.classList.add("medium");
+          } else {
+            summaryCpu.classList.add("low");
+          }
+
+          // Memory
+          const [total, free, used, buffCache] = summary.memUsage.split(',').map(s => s.trim());
+          summaryMem.innerHTML = `
+            <div>총: ${total}</div>
+            <div>사용: ${used}</div>
+            <div>남음: ${free}</div>
+            <div>버퍼/캐시: ${buffCache}</div>
+          `;
+
+          // Tasks
+          const taskLines = summary.tasks.split(',').map(s => s.trim());
+          summaryTasks.innerHTML = `
+            <div>전체: ${taskLines[0]}</div>
+            <div>실행 중: ${taskLines[1]}</div>
+            <div>슬립: ${taskLines[2]}</div>
+            <div>좀비: ${taskLines[4]}</div>
+          `;
+
+          // Load Average
+          const [load1, load5, load15] = summary.loadAverage.split(',').map(s => s.trim());
+          summaryLoad.innerHTML = `
+            <div>1분: ${load1}</div>
+            <div>5분: ${load5}</div>
+            <div>15분: ${load15}</div>
+          `;
 
           renderTable();
         } catch (error) {
@@ -172,10 +224,8 @@
         }
       };
 
-      // 검색 이벤트
       searchInput.addEventListener('input', renderTable);
 
-      // 정렬 이벤트
       headers.forEach(header => {
         header.addEventListener('click', () => {
           const key = header.dataset.key;

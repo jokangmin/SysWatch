@@ -1,4 +1,4 @@
-import express, { Router, Request, Response, NextFunction } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import path from "path";
 import systemRouter from "./routes/system";
 
