@@ -22,6 +22,7 @@ VM, 원격(또는 로컬) Linux 서버의 `top` 출력을 파싱하여 시스템
 
 ## 프로젝트 구조 (현재)
 
+```
 backend/
 ├─ src/
 │ ├─ controllers/
@@ -35,6 +36,7 @@ backend/
 ├─ package.json
 ├─ tsconfig.json
 └─ .env # 환경변수 (로컬에만)
+```
 
 ---
 
