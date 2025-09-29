@@ -2,7 +2,7 @@
 
 VM, 원격(또는 로컬) Linux 서버의 `top` 출력을 파싱하여 시스템 요약(부하, CPU, 메모리, 태스크)과 프로세스 리스트를 JSON으로 제공하고, `index.html` 기반의 간단한 대시보드에서 실시간(주기적 폴링)으로 시각화하는 프로젝트입니다.
 
-<img width="1307" height="963" alt="main syswatch" src="https://github.com/user-attachments/assets/ea3f2cef-34ff-4bd2-b04a-e9a743c0951c" />
+<img width="1307" height="959" alt="main syswatch" src="https://github.com/user-attachments/assets/9dd378a8-af56-488e-8ab8-6217a4b475f5" />
 
 ---
 
@@ -14,9 +14,9 @@ VM, 원격(또는 로컬) Linux 서버의 `top` 출력을 파싱하여 시스템
   - `GET /system/` : 기본 응답 (테스트)
   - `GET /system/proc` : 시스템 상태 JSON 응답 (summary + processes)
 - 클라이언트:
-  - 요약 카드(부하/CPU/메모리/태스크)
+  - CPU / 메모리 / 태스크 / 부하 평균 → 차트 시각화
   - 프로세스 테이블(검색 + 정렬)
-  - 주기적 갱신(기본 5초)
+  - 5초 주기 갱신 (setInterval)
 
 ---
 
@@ -44,11 +44,11 @@ backend/
 
 - **Node.js**: 런타임. 서버 사이드 JS 실행 환경.
 - **TypeScript**: 정적 타입 지원. 코드 안정성 향상.
-- **Express**: REST API 및 정적 파일 서빙 (서버).
+- **Express**: REST API 및 정적 파일 서빙.
 - **child_process.exec**: `ssh <user>@<host> "top -b -n 1"` 명령 실행하여 원격 `top` 출력 획득.
 - **SSH**: 원격 서버 접속(권장: 공개키 인증).  
-- **Vanilla JS + HTML/CSS**: 프론트엔드 대시보드 (검색/정렬/렌더링/주기 갱신) => DOM 조작 및 필터링 & 정렬 (document.getElementById 등).
-- **dotenv**: .env 파일을 통해 VM 접속 정보 로드.
+- **Vanilla JS + HTML/CSS: 대시보드 UI**: DOM 조작 기반 필터/정렬, Chart.js (CPU/메모리/태스크/부하 시각화).
+- **dotenv**: .env 환경변수 관리.
 
 ---
 
@@ -95,16 +95,18 @@ interface ProcessInfo {
   comm: string;
 }
 ```
-- 전체 응답 타입
+```ts
+interface SystemSummary {
+  loadAverage: string;
+  tasks: string;
+  cpuUsage: string;
+  memUsage: string;
+  swapUsage: string;
+}
+```
 ```ts
 interface SystemStatus {
-  summary: {
-    loadAverage: string;
-    tasks: string;
-    cpuUsage: string;
-    memUsage: string;
-    swapUsage: string;
-  };
+  summary: SystemSummary;
   processes: ProcessInfo[];
 }
 ```
