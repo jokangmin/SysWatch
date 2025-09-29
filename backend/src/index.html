@@ -37,9 +37,6 @@
     .summary-box { flex: 1; min-width: 220px; text-align: center; }
     .summary-title { font-size: 1em; color: #6c757d; margin-bottom: 5px; }
     .summary-value { font-size: 1em; color: #343a40; font-weight: 500; line-height: 1.6; }
-    .summary-value[data-type="cpu"].high { color: #dc3545; }
-    .summary-value[data-type="cpu"].medium { color: #ffc107; }
-    .summary-value[data-type="cpu"].low { color: #28a745; }
 
     #controls {
       display: flex;
@@ -63,6 +60,8 @@
     tbody tr:hover { background-color: #e9ecef; }
     .loading { text-align: center; padding: 20px; font-size: 1.2em; color: #777; }
   </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="container">
@@ -71,33 +70,20 @@
     <div id="system-summary">
       <div class="summary-box">
         <div class="summary-title">⚙️ CPU 사용률</div>
-        <div class="summary-value" id="summary-cpu" data-type="cpu">Loading...</div>
+        <canvas id="cpuChart" width="160" height="160"></canvas>
+        <div id="cpuTotal" style="margin-top:8px; font-weight:500;">Loading...</div>
       </div>
       <div class="summary-box">
         <div class="summary-title">🧠 메모리 사용량</div>
-        <div class="summary-value" id="summary-mem">
-          <div>총: -</div>
-          <div>사용: -</div>
-          <div>남음: -</div>
-          <div>버퍼/캐시: -</div>
-        </div>
+        <canvas id="memChart" width="200" height="150"></canvas>
       </div>
       <div class="summary-box">
         <div class="summary-title">📋 작업(Task)</div>
-        <div class="summary-value" id="summary-tasks">
-          <div>전체: -</div>
-          <div>실행 중: -</div>
-          <div>슬립: -</div>
-          <div>좀비: -</div>
-        </div>
+        <canvas id="taskChart" width="200" height="150"></canvas>
       </div>
       <div class="summary-box">
         <div class="summary-title">📊 부하 평균</div>
-        <div class="summary-value" id="summary-load">
-          <div>1분: -</div>
-          <div>5분: -</div>
-          <div>15분: -</div>
-        </div>
+        <canvas id="loadChart" width="200" height="150"></canvas>
       </div>
     </div>
 
@@ -126,19 +112,15 @@
 
 
   <script>
-    
     document.addEventListener('DOMContentLoaded', () => {
       const tableBody = document.getElementById('process-body');
-      const summaryCpu = document.getElementById('summary-cpu');
-      const summaryMem = document.getElementById('summary-mem');
-      const summaryTasks = document.getElementById('summary-tasks');
-      const summaryLoad = document.getElementById('summary-load');
       const searchInput = document.getElementById('search');
       const headers = document.querySelectorAll("thead th");
 
       let processes = [];
       let sortKey = "cpu";
       let sortOrder = "desc";
+      let cpuChart, memChart, taskChart, loadChart;
 
       const renderTable = () => {
         const query = searchInput.value.toLowerCase();
@@ -171,6 +153,131 @@
         });
       };
 
+      function parseCpuUsage(raw){
+        const stats = {};
+        raw.split(",").forEach(part => {
+            const [value, key] = part.trim().split(" ");
+            if(key) stats[key] = parseFloat(value);
+        });
+        return stats;
+      }
+
+      function renderCpuChart(rawCpuUsage){
+        const stats = parseCpuUsage(rawCpuUsage);
+        const totalUsage = 100 - (stats["id"] || 0);
+        const ctx = document.getElementById("cpuChart").getContext("2d");
+
+        const data = {
+            labels: ["User", "System", "Nice", "IOwait", "IRQ", "SoftIRQ", "Steal", "Idle"],
+            datasets: [{
+                data: [
+                    stats["us"] || 0,
+                    stats["sy"] || 0,
+                    stats["ni"] || 0,
+                    stats["wa"] || 0,
+                    stats["hi"] || 0,
+                    stats["si"] || 0,
+                    stats["st"] || 0,
+                    stats["id"] || 0
+                ],
+                backgroundColor: [
+                    "#4CAF50", // User
+                    "#F44336", // System
+                    "#FF9800", // Nice
+                    "#2196F3", // IOwait
+                    "#9C27B0", // IRQ
+                    "#00BCD4", // SoftIRQ
+                    "#795548", // Steal
+                    "#E0E0E0"  // Idle
+                ],
+            }]
+        };
+
+        if(cpuChart){
+            cpuChart.data = data;
+            cpuChart.update();
+        }else{
+            cpuChart = new Chart(ctx, {
+                type: "doughnut",
+                data,
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: "bottom" }
+                    }
+                }
+            });
+        }
+
+        document.getElementById("cpuTotal").textContent = `총 사용률: ${totalUsage.toFixed(1)}%`;
+      }
+
+      function renderMemChart(memSummary){
+        const ctx = document.getElementById("memChart").getContext("2d");
+        const [total, free, used, buffCache] = memSummary.split(',').map(s => s.trim());
+
+        const data = {
+            labels: ["전체", "사용", "남음", "버퍼/캐시"],
+            datasets: [{
+                label: "메모리 (MB)",
+                data: [(parseFloat(total) / 1024).toFixed(2), 
+                       (parseFloat(used) / 1024).toFixed(2), 
+                       (parseFloat(free) / 1024).toFixed(2), 
+                       (parseFloat(buffCache) / 1024).toFixed(2)],
+                backgroundColor: ["#23A4DB", "#F44336", "#4CAF50", "#FF9800"],
+            }]
+        };
+
+        if (memChart) {
+            memChart.data = data;
+            memChart.update();
+        } else {
+            memChart = new Chart(ctx, { type: "bar", data });
+        }
+      }
+
+      function renderTaskChart(taskSummary){
+        const ctx = document.getElementById("taskChart").getContext("2d");
+        const [total, running, sleeping, stopped, zombie] = taskSummary.split(',').map(s => s.trim());
+
+        const data = {
+            labels: ["실행", "슬립", "좀비"],
+            datasets: [{
+                label: "작업(Task) 개수",  
+                data: [parseFloat(running), parseFloat(sleeping), parseFloat(zombie)],
+                backgroundColor: ["#2196F3", "#FFC107", "#9C27B0"]
+            }]
+        };
+
+        if (taskChart) {
+            taskChart.data = data;
+            taskChart.update();
+        } else {
+            taskChart = new Chart(ctx, { type: "bar", data });
+        }
+      }
+
+      function renderLoadChart(loadSummary) {
+        const ctx = document.getElementById("loadChart").getContext("2d");
+        const [load1, load5, load15] = loadSummary.split(',').map(s => s.trim());
+
+        const data = {
+        labels: ["1분", "5분", "15분"],
+        datasets: [{
+            label: "부하 평균 수",
+            data: [parseFloat(load1), parseFloat(load5), parseFloat(load15)],
+            backgroundColor: ["#00BCD4", "#8BC34A", "#FF5722"]
+        }]
+        };
+
+        if (loadChart) {
+            loadChart.data = data;
+            loadChart.update();
+        } else {
+            loadChart = new Chart(ctx, { type: "bar", data });
+        }
+      }
+
       const fetchSystemStatus = async () => {
         try {
           const response = await fetch('/system/proc');
@@ -180,47 +287,21 @@
           processes = data;
 
           // CPU
-          summaryCpu.textContent = summary.cpuUsage;
-          const cpuPercent = parseFloat(summary.cpuUsage.split(',')[0]);
-          if (cpuPercent > 50) {
-            summaryCpu.classList.add("high");
-          } else if (cpuPercent > 20) {
-            summaryCpu.classList.add("medium");
-          } else {
-            summaryCpu.classList.add("low");
-          }
+          renderCpuChart(summary.cpuUsage);
 
           // Memory
-          const [total, free, used, buffCache] = summary.memUsage.split(',').map(s => s.trim());
-          summaryMem.innerHTML = `
-            <div>총: ${total}</div>
-            <div>사용: ${used}</div>
-            <div>남음: ${free}</div>
-            <div>버퍼/캐시: ${buffCache}</div>
-          `;
+          renderMemChart(summary.memUsage);
 
           // Tasks
-          const taskLines = summary.tasks.split(',').map(s => s.trim());
-          summaryTasks.innerHTML = `
-            <div>전체: ${taskLines[0]}</div>
-            <div>실행 중: ${taskLines[1]}</div>
-            <div>슬립: ${taskLines[2]}</div>
-            <div>좀비: ${taskLines[4]}</div>
-          `;
+          renderTaskChart(summary.tasks);
 
           // Load Average
-          const [load1, load5, load15] = summary.loadAverage.split(',').map(s => s.trim());
-          summaryLoad.innerHTML = `
-            <div>1분: ${load1}</div>
-            <div>5분: ${load5}</div>
-            <div>15분: ${load15}</div>
-          `;
+          renderLoadChart(summary.loadAverage);
 
           renderTable();
         } catch (error) {
           console.error("시스템 상태를 가져오는 데 실패했습니다:", error);
           tableBody.innerHTML = `<tr><td colspan="5" class="loading" style="color: red;">데이터 로딩 실패!</td></tr>`;
-          summaryCpu.textContent = summaryMem.textContent = summaryTasks.textContent = summaryLoad.textContent = 'Error';
         }
       };
 
