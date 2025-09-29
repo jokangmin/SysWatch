@@ -2,7 +2,7 @@
 
 VM, 원격(또는 로컬) Linux 서버의 `top` 출력을 파싱하여 시스템 요약(부하, CPU, 메모리, 태스크)과 프로세스 리스트를 JSON으로 제공하고, `index.html` 기반의 간단한 대시보드에서 실시간(주기적 폴링)으로 시각화하는 프로젝트입니다.
 
-<img width="1307" height="959" alt="main syswatch" src="https://github.com/user-attachments/assets/9dd378a8-af56-488e-8ab8-6217a4b475f5" />
+<img width="1319" height="960" alt="main syswatch" src="https://github.com/user-attachments/assets/787dfb6c-7ce7-46f7-8afd-9d205494c45f" />
 
 ---
 
